@@ -1,0 +1,212 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String?  @unique
+  phone         String?  @unique
+  name          String?
+  avatar        String?
+  isVerified    Boolean  @default(false)
+  isBlocked     Boolean  @default(false)
+  role          UserRole @default(USER)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  properties    Property[]
+  conversationsAsBuyer  Conversation[] @relation("ConversationBuyer")
+  conversationsAsSeller Conversation[] @relation("ConversationSeller")
+  messages      Message[]
+  reportsAsReporter Report[] @relation("ReportReporter")
+  reportsAsUser     Report[] @relation("ReportUser")
+
+  @@map("users")
+}
+
+model Property {
+  id              String           @id @default(cuid())
+  title           String
+  description     String?
+  price           Float
+  isNegotiable    Boolean          @default(false)
+  area            Float
+  areaUnit        AreaUnit         @default(SQ_FT)
+  status          PropertyStatus   @default(ACTIVE)
+  isApproved      Boolean          @default(false)
+  isPromoted      Boolean          @default(false)
+  latitude        Float?
+  longitude       Float?
+  address         String?
+  city            String?
+  state           String?
+  pincode         String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  // Relations
+  sellerId        String
+  seller          User             @relation(fields: [sellerId], references: [id])
+  categoryId      String
+  category        PropertyCategory @relation(fields: [categoryId], references: [id])
+  images          PropertyImage[]
+  features        PropertyFeature[]
+  conversations   Conversation[]
+  reports         Report[]
+
+  @@map("properties")
+}
+
+model PropertyCategory {
+  id          String           @id @default(cuid())
+  name        String
+  description String?
+  icon        String?
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  // Relations
+  properties  Property[]
+
+  @@map("property_categories")
+}
+
+model PropertyImage {
+  id         String   @id @default(cuid())
+  url        String
+  altText    String?
+  order      Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  // Relations
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@map("property_images")
+}
+
+model PropertyFeature {
+  id          String          @id @default(cuid())
+  bedrooms    Int?
+  bathrooms   Int?
+  parking     Int?
+  furnishing  FurnishingType @default(UNFURNISHED)
+  amenities   String?         // JSON string for additional amenities
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  // Relations
+  propertyId  String
+  property    Property        @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@map("property_features")
+}
+
+model Conversation {
+  id          String           @id @default(cuid())
+  propertyId  String
+  buyerId     String
+  sellerId    String
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  // Relations
+  property    Property         @relation(fields: [propertyId], references: [id])
+  buyer       User            @relation("ConversationBuyer", fields: [buyerId], references: [id])
+  seller      User            @relation("ConversationSeller", fields: [sellerId], references: [id])
+  messages    Message[]
+
+  @@map("conversations")
+}
+
+model Message {
+  id            String        @id @default(cuid())
+  content       String
+  messageType   MessageType   @default(TEXT)
+  conversationId String
+  senderId      String
+  isRead        Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+
+  // Relations
+  conversation  Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender        User          @relation(fields: [senderId], references: [id])
+
+  @@map("messages")
+}
+
+model Report {
+  id          String       @id @default(cuid())
+  reason      String
+  description String?
+  status      ReportStatus @default(PENDING)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // Relations
+  reporterId  String
+  reporter    User         @relation("ReportReporter", fields: [reporterId], references: [id])
+  propertyId  String?
+  property    Property?    @relation(fields: [propertyId], references: [id])
+  userId      String?
+  user        User?        @relation("ReportUser", fields: [userId], references: [id])
+
+  @@map("reports")
+}
+
+// Enums
+enum UserRole {
+  USER
+  ADMIN
+  MODERATOR
+}
+
+enum PropertyStatus {
+  ACTIVE
+  INACTIVE
+  SOLD
+  RENTED
+  PENDING
+}
+
+enum AreaUnit {
+  SQ_FT
+  SQ_YARDS
+  SQ_METERS
+  ACRES
+  GUNTHA
+}
+
+enum FurnishingType {
+  UNFURNISHED
+  SEMI_FURNISHED
+  FULLY_FURNISHED
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  LOCATION
+  CONTACT
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  DISMISSED
+}
